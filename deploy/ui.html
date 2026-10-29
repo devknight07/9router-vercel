@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>9Router — MongoDB Sync</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3352;
+    --accent: #6c72f8;
+    --accent-h: #8b91ff;
+    --accent-d: #4a4fcc;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #7a8299;
+    --radius: 10px;
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+
+  /* ── Layout ── */
+  .page { max-width: 860px; margin: 0 auto; }
+
+  /* ── Header ── */
+  .header {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 32px; padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    width: 42px; height: 42px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent) 0%, #9b4dff 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .header-text h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
+  .header-text p  { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .tag {
+    margin-left: auto;
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 20px; font-size: 11px; color: var(--muted);
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    margin-bottom: 20px;
+  }
+  .card-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 18px;
+  }
+  .card-icon {
+    width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+  }
+  .card-header h2 { font-size: 15px; font-weight: 600; }
+  .card-header p  { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  /* ── Form ── */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .form-grid.single { grid-template-columns: 1fr; }
+  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.span2 { grid-column: 1/-1; }
+
+  label { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: 0.2px; }
+
+  input[type="text"], input[type="password"] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    transition: border-color .15s;
+    width: 100%;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  input::placeholder { color: var(--muted); opacity: .6; }
+
+  .checkbox-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--muted);
+    margin-bottom: 14px; cursor: pointer;
+  }
+  .checkbox-row input[type="checkbox"] {
+    width: 15px; height: 15px; accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  /* ── Buttons ── */
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px; border-radius: 7px; border: none;
+    font-size: 13px; font-weight: 600; font-family: var(--font);
+    cursor: pointer; transition: all .15s;
+    white-space: nowrap;
+  }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-h); }
+  .btn-secondary {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+  .btn-danger:hover:not(:disabled) { background: rgba(239,68,68,.25); }
+  .btn-success { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+  .btn-success:hover:not(:disabled) { background: rgba(34,197,94,.25); }
+  .spin { animation: spin .7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Status badge / image info ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .badge.green { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+  .badge.red   { background: rgba(239,68,68,.15);  color: var(--red);   border: 1px solid rgba(239,68,68,.3); }
+  .badge.yellow{ background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+  .badge.grey  { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── Log/output area ── */
+  .log-area {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 14px 16px;
+    font-family: 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text);
+    min-height: 80px;
+    max-height: 260px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 14px;
+  }
+  .log-line { }
+  .log-ok   { color: var(--green); }
+  .log-err  { color: var(--red); }
+  .log-info { color: var(--accent-h); }
+  .log-warn { color: var(--yellow); }
+  .log-dim  { color: var(--muted); }
+  .log-area:empty::before { content: 'Output will appear here…'; color: var(--muted); }
+
+  /* ── Image stats ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .stat-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 12px 14px;
+  }
+  .stat-box .label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .stat-box .value { font-size: 18px; font-weight: 700; }
+  .stat-box .sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: var(--border); margin: 6px 0 14px; }
+
+  /* ── Alert banner ── */
+  .alert {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 12px 14px; border-radius: 7px; font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .alert.info  { background: rgba(108,114,248,.1); border: 1px solid rgba(108,114,248,.3); color: #b0b5ff; }
+  .alert.warn  { background: rgba(245,158,11,.1);  border: 1px solid rgba(245,158,11,.3);  color: #fcd34d; }
+  .alert.error { background: rgba(239,68,68,.1);   border: 1px solid rgba(239,68,68,.3);   color: #fca5a5; }
+  .alert-icon  { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+  /* ── Connection shared form (collapsed) ── */
+  .conn-row {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 12px;
+    margin-bottom: 14px; cursor: pointer;
+  }
+  .conn-row .uri-preview { flex: 1; font-family: monospace; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .conn-badge { font-size: 11px; }
+
+  /* ── Section tabs ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab {
+    padding: 7px 16px; border-radius: 7px; font-size: 13px;
+    font-weight: 600; cursor: pointer; border: 1px solid transparent;
+    color: var(--muted); transition: all .15s;
+  }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tab:not(.active):hover { color: var(--text); border-color: var(--border); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Progress bar */
+  .progress-wrap { margin-top: 10px; }
+  .progress-bar {
+    height: 4px; border-radius: 2px;
+    background: var(--border); overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 2px;
+    background: var(--accent);
+    transition: width .3s;
+  }
+  .progress-text { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">🍃</div>
+    <div class="header-text">
+      <h1>9Router MongoDB Sync</h1>
+      <p>Manage your Vercel + MongoDB deployment database</p>
+    </div>
+    <div class="tag" id="envTag">loading…</div>
+  </div>
+
+  <!-- Connection Card -->
+  <div class="card" id="connCard">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(108,114,248,.15)">🔌</div>
+      <div>
+        <h2>MongoDB Connection</h2>
+        <p>Configure your Atlas / self-hosted connection string</p>
+      </div>
+      <div style="margin-left:auto">
+        <span class="badge grey" id="connStatus">Not tested</span>
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <div class="field span2">
+        <label>MONGODB_URI</label>
+        <input type="password" id="uri" placeholder="mongodb+srv://user:pass@cluster.mongodb.net/" autocomplete="off"/>
+      </div>
+      <div class="field">
+        <label>Database name</label>
+        <input type="text" id="dbName" value="9router" placeholder="9router"/>
+      </div>
+      <div class="field">
+        <label>Collection</label>
+        <input type="text" id="collName" value="sqlite_store" placeholder="sqlite_store"/>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnVerify" onclick="doVerify()">
+        <span>▶</span> Test Connection
+      </button>
+      <button class="btn btn-secondary" id="btnStatus" onclick="doStatus()">
+        ↻ Refresh Status
+      </button>
+    </div>
+
+    <div class="log-area" id="connLog"></div>
+
+    <div class="stats-grid" id="statsGrid" style="display:none">
+      <div class="stat-box">
+        <div class="label">Version</div>
+        <div class="value" id="statVersion">—</div>
+        <div class="sub">writes since creation</div>
+      </div>
+      <div class="stat-box">
+        <div class="label">Raw size</div>
+        <div class="value" id="statSize">—</div>
+        <div class="sub">MB on disk</div>
+      </div>
+      <div class="stat-box">
+        <div class="label">Last updated</div>
+        <div class="value" id="statUpdated" style="font-size:13px">—</div>
+        <div class="sub" id="statUpdatedRel"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Operations Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('import')">⬆ Upload to MongoDB</div>
+    <div class="tab" onclick="switchTab('download')">⬇ Download from MongoDB</div>
+  </div>
+
+  <!-- Import Panel -->
+  <div class="tab-panel active" id="panel-import">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(34,197,94,.15)">⬆</div>
+        <div>
+          <h2>Upload Local SQLite → MongoDB</h2>
+          <p>Migrate your local 9Router database to Vercel / MongoDB</p>
+        </div>
+      </div>
+
+      <div class="alert info">
+        <span class="alert-icon">ℹ</span>
+        <span>Uploads your local <code>data.sqlite</code> to MongoDB as a gzip-compressed image. After uploading, redeploy on Vercel — the new image loads automatically on the next cold start.</span>
+      </div>
+
+      <div class="form-grid single">
+        <div class="field">
+          <label>Local SQLite path</label>
+          <input type="text" id="sqlitePath" placeholder="C:\Users\…\AppData\Roaming\9router\db\data.sqlite"/>
+        </div>
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="forceOverwrite"/>
+        <label for="forceOverwrite" style="color:var(--yellow);cursor:pointer">
+          ⚠ Force overwrite — replaces existing MongoDB image
+        </label>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-success" id="btnImport" onclick="doImport()">
+          ⬆ Upload to MongoDB
+        </button>
+      </div>
+
+      <div class="log-area" id="importLog"></div>
+
+      <div id="importResult" style="display:none; margin-top:14px">
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="label">Raw size</div>
+            <div class="value" id="impRaw">—</div>
+            <div class="sub">MB</div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Gzipped</div>
+            <div class="value" id="impGzip">—</div>
+            <div class="sub">MB stored</div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Status</div>
+            <div class="value" style="font-size:13px" id="impStatus">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Download Panel -->
+  <div class="tab-panel" id="panel-download">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(245,158,11,.15)">⬇</div>
+        <div>
+          <h2>Download MongoDB → Local</h2>
+          <p>Export the MongoDB image back to a local SQLite file</p>
+        </div>
+      </div>
+
+      <div class="alert warn">
+        <span class="alert-icon">⚠</span>
+        <span>Downloads the current MongoDB database image to your browser as <code>data.sqlite</code>. Use this to back up or restore your Vercel deployment locally.</span>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnDownload" onclick="doDownload()">
+          ⬇ Download data.sqlite
+        </button>
+      </div>
+
+      <div class="log-area" id="downloadLog"></div>
+
+      <div id="downloadResult" style="display:none; margin-top:14px">
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="label">Version</div>
+            <div class="value" id="dlVersion">—</div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Raw size</div>
+            <div class="value" id="dlRaw">—</div>
+            <div class="sub">MB</div>
+          </div>
+          <div class="stat-box">
+            <div class="label">Gzipped</div>
+            <div class="value" id="dlGzip">—</div>
+            <div class="sub">MB in MongoDB</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center; margin-top:32px; font-size:12px; color:var(--muted)">
+    9Router MongoDB Sync UI — deploy/ui-server.mjs &nbsp;·&nbsp; Changes only affect <code>deploy/</code>
+  </div>
+
+</div>
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function conn() {
+  return {
+    uri:        document.getElementById('uri').value.trim(),
+    db:         document.getElementById('dbName').value.trim() || '9router',
+    collection: document.getElementById('collName').value.trim() || 'sqlite_store',
+  };
+}
+
+function log(elId, msg, cls = '') {
+  const el = document.getElementById(elId);
+  if (!msg && msg !== 0) return;
+  const line = document.createElement('div');
+  line.className = 'log-line ' + (cls ? 'log-' + cls : '');
+  line.textContent = msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+function clearLog(elId) { document.getElementById(elId).innerHTML = ''; }
+
+async function post(path, body) {
+  const r = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return r.json();
+}
+
+function setBusy(btnId, busy, label, icon) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = busy;
+  btn.innerHTML = busy
+    ? `<span class="spin">⟳</span> Working…`
+    : `<span>${icon}</span> ${label}`;
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const d = Math.round((Date.now() - new Date(iso)) / 1000);
+  if (d < 60) return `${d}s ago`;
+  if (d < 3600) return `${Math.floor(d/60)}m ago`;
+  if (d < 86400) return `${Math.floor(d/3600)}h ago`;
+  return `${Math.floor(d/86400)}d ago`;
+}
+
+function showStats(image) {
+  const g = document.getElementById('statsGrid');
+  if (!image) { g.style.display = 'none'; return; }
+  g.style.display = 'grid';
+  document.getElementById('statVersion').textContent = image.version ?? '—';
+  document.getElementById('statSize').textContent = image.rawSizeMB ?? '—';
+  const upd = image.updatedAt ? new Date(image.updatedAt).toLocaleString() : '—';
+  document.getElementById('statUpdated').textContent = upd;
+  document.getElementById('statUpdatedRel').textContent = timeAgo(image.updatedAt);
+}
+
+function setConnBadge(state) {
+  const b = document.getElementById('connStatus');
+  const map = {
+    ok:      ['green',  '✔ Connected'],
+    error:   ['red',    '✘ Failed'],
+    testing: ['yellow', '⟳ Testing…'],
+    idle:    ['grey',   'Not tested'],
+  };
+  const [cls, txt] = map[state] || map.idle;
+  b.className = `badge ${cls}`;
+  b.textContent = txt;
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', t.textContent.toLowerCase().includes(name));
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'panel-' + name);
+  });
+}
+
+// ── Verify connection ─────────────────────────────────────────────────────────
+async function doVerify() {
+  clearLog('connLog');
+  document.getElementById('statsGrid').style.display = 'none';
+  setConnBadge('testing');
+  setBusy('btnVerify', true, 'Test Connection', '▶');
+  log('connLog', '⟳ Connecting to MongoDB…', 'info');
+
+  const data = await post('/api/verify', conn()).catch(e => ({ ok: false, error: e.message }));
+
+  if (data.ok) {
+    setConnBadge('ok');
+    log('connLog', `✔ Ping: ${data.ping}`, 'ok');
+    log('connLog', `✔ Write/read/delete probe: ${data.probe}`, 'ok');
+    log('connLog', `  Database: ${data.dbName} / ${data.collectionName}`, 'dim');
+    if (data.image) {
+      log('connLog', `  DB image: v${data.image.version} · ${data.image.rawSizeMB} MB · updated ${data.image.updatedAt || '—'}`, 'info');
+      showStats(data.image);
+    } else {
+      log('connLog', '  No existing 9Router DB image — first boot will create it.', 'dim');
+      showStats(null);
+    }
+    log('connLog', '✔ MongoDB is ready for 9Router ✔', 'ok');
+  } else {
+    setConnBadge('error');
+    log('connLog', `✘ ${data.error}`, 'err');
+    log('connLog', 'Hints: check Atlas → Network Access (allow 0.0.0.0/0), user password, and URI scheme (mongodb+srv://).', 'warn');
+  }
+
+  setBusy('btnVerify', false, 'Test Connection', '▶');
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+async function doStatus() {
+  clearLog('connLog');
+  setBusy('btnStatus', true, 'Refresh Status', '↻');
+  log('connLog', '⟳ Fetching DB image status…', 'info');
+
+  const data = await post('/api/status', conn()).catch(e => ({ ok: false, error: e.message }));
+  if (data.ok) {
+    if (data.image) {
+      log('connLog', `  Database: ${data.dbName} / ${data.collectionName}`, 'dim');
+      log('connLog', `  Image version: v${data.image.version}`, 'info');
+      log('connLog', `  Raw size: ${data.image.rawSizeMB} MB`, 'info');
+      log('connLog', `  Updated: ${data.image.updatedAt || '—'}`, 'info');
+      log('connLog', `  Created: ${data.image.createdAt || '—'}`, 'dim');
+      showStats(data.image);
+      setConnBadge('ok');
+    } else {
+      log('connLog', '  No DB image found in MongoDB (not yet deployed or empty).', 'warn');
+      showStats(null);
+    }
+  } else {
+    log('connLog', `✘ ${data.error}`, 'err');
+    setConnBadge('error');
+  }
+
+  setBusy('btnStatus', false, 'Refresh Status', '↻');
+}
+
+// ── Import ────────────────────────────────────────────────────────────────────
+async function doImport() {
+  clearLog('importLog');
+  document.getElementById('importResult').style.display = 'none';
+  setBusy('btnImport', true, 'Upload to MongoDB', '⬆');
+
+  const body = {
+    ...conn(),
+    file: document.getElementById('sqlitePath').value.trim() || undefined,
+    force: document.getElementById('forceOverwrite').checked,
+  };
+
+  log('importLog', '⟳ Reading local SQLite file…', 'info');
+  const data = await post('/api/import', body).catch(e => ({ ok: false, error: e.message }));
+
+  if (data.ok) {
+    log('importLog', `✔ Uploaded: ${data.file}`, 'ok');
+    log('importLog', `  Raw: ${data.rawSizeMB} MB → Gzipped: ${data.gzippedSizeMB} MB`, 'info');
+    log('importLog', `  Destination: mongodb:${data.dbName}/${data.collectionName}`, 'dim');
+    log('importLog', `  matched=${data.matched} upserted=${data.upserted}`, 'dim');
+    log('importLog', '✔ Done — redeploy on Vercel to pick up the new image.', 'ok');
+
+    const r = document.getElementById('importResult');
+    r.style.display = 'block';
+    document.getElementById('impRaw').textContent  = data.rawSizeMB;
+    document.getElementById('impGzip').textContent = data.gzippedSizeMB;
+    document.getElementById('impStatus').textContent = data.upserted ? 'Created' : 'Replaced';
+  } else {
+    log('importLog', `✘ ${data.error}`, 'err');
+  }
+
+  setBusy('btnImport', false, 'Upload to MongoDB', '⬆');
+}
+
+// ── Download ──────────────────────────────────────────────────────────────────
+async function doDownload() {
+  clearLog('downloadLog');
+  document.getElementById('downloadResult').style.display = 'none';
+  setBusy('btnDownload', true, 'Download data.sqlite', '⬇');
+
+  log('downloadLog', '⟳ Fetching image from MongoDB…', 'info');
+  const data = await post('/api/download', conn()).catch(e => ({ ok: false, error: e.message }));
+
+  if (data.ok) {
+    log('downloadLog', `✔ Got image v${data.version} (${data.rawSizeMB} MB raw, ${data.gzippedSizeMB} MB gzipped)`, 'ok');
+    log('downloadLog', '⟳ Preparing browser download…', 'info');
+
+    // base64 → Uint8Array → Blob → download
+    const bytes = Uint8Array.from(atob(data.base64), c => c.charCodeAt(0));
+    const blob = new Blob([bytes], { type: 'application/octet-stream' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'data.sqlite';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+
+    log('downloadLog', '✔ Download started — check your browser downloads folder.', 'ok');
+
+    document.getElementById('downloadResult').style.display = 'block';
+    document.getElementById('dlVersion').textContent = data.version;
+    document.getElementById('dlRaw').textContent     = data.rawSizeMB;
+    document.getElementById('dlGzip').textContent    = data.gzippedSizeMB;
+  } else {
+    log('downloadLog', `✘ ${data.error}`, 'err');
+  }
+
+  setBusy('btnDownload', false, 'Download data.sqlite', '⬇');
+}
+
+// ── Init: load env defaults ───────────────────────────────────────────────────
+(async () => {
+  try {
+    const cfg = await fetch('/api/config').then(r => r.json());
+    if (cfg.uri)         document.getElementById('uri').value      = cfg.uri;
+    if (cfg.db)          document.getElementById('dbName').value   = cfg.db;
+    if (cfg.collection)  document.getElementById('collName').value = cfg.collection;
+    if (cfg.defaultSqlitePath) document.getElementById('sqlitePath').placeholder = cfg.defaultSqlitePath;
+
+    const tag = document.getElementById('envTag');
+    if (cfg.uri) {
+      const masked = cfg.uri.replace(/:([^@]+)@/, ':***@');
+      tag.textContent = masked.length > 40 ? masked.slice(0, 40) + '…' : masked;
+      tag.title = 'URI loaded from .env';
+    } else {
+      tag.textContent = 'No MONGODB_URI in .env';
+    }
+
+    if (!cfg.mongodbInstalled) {
+      const warn = document.createElement('div');
+      warn.className = 'alert error';
+      warn.innerHTML = '<span class="alert-icon">✘</span><span>The <code>mongodb</code> npm package is not installed. Run <code>npm install --no-save mongodb@6</code> in the repo root, then restart this server.</span>';
+      document.querySelector('.page').insertBefore(warn, document.getElementById('connCard'));
+    }
+  } catch (e) {
+    document.getElementById('envTag').textContent = 'server error';
+  }
+})();
+</script>
+</body>
+</html>
+

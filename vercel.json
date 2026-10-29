@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "npm install && npm install --no-save mongodb@6",
+  "env": {
+    "DATA_DIR": "/tmp/9router",
+    "ENABLE_REQUEST_LOGS": "false",
+    "AUTH_COOKIE_SECURE": "true"
+  }
+}
